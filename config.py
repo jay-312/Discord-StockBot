@@ -1,0 +1,4 @@
+API = {
+    'DiscordToken' : "",
+    "NewsapiToken" : ""
+}
