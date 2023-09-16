@@ -28,8 +28,51 @@ def is_valid_date(date_str):
 # Creating default values for startDate and endDate 
 endDate = datetime.today().date()
 startDate = endDate - timedelta(days=(365*2))
-endDate = f'{endDate}'      #converting to string
+#converting Dates into String
+endDate = f'{endDate}'      
 startDate = f'{startDate}'
+
+# Custom exception class for your Discord bot
+class CustomError(commands.CommandError):
+    def __init__(self, message):
+        self.message = message
+
+async def Stock_chart(ctx,stockName,startDate,endDate):    
+    #check if the dates are in valid format or not
+    try:
+        StockDisplay = stockName.split('.')[0].upper()
+        if not is_valid_date(startDate) or not is_valid_date(endDate):
+            raise CustomError("Invalid date format. Use 'YYYY-MM-DD'.")
+        
+        #convert String date into Datetime format
+        start_date = datetime.strptime(startDate, "%Y-%m-%d")
+        end_date = datetime.strptime(endDate, "%Y-%m-%d")
+        
+        if end_date <= start_date:
+            raise CustomError("End date must be greater than start date.")
+
+        data = yf.download(stockName,start=start_date,end=end_date)
+        print(data.head())
+
+        if data.empty:
+            raise CustomError(f"No data available for {StockDisplay}. If its Non Indian Company try $chart-us")
+        
+        #To create and save a plot
+        plt.figure(figsize=(12, 6))
+        plt.plot(data.index, data['Adj Close'], label='Adjusted Close Price', color='blue')
+        plt.title(f'{StockDisplay} Adjusted Close Price')
+        plt.xlabel('Date')
+        plt.ylabel('Price')
+        plt.legend()
+        plt.grid(True)
+        filename = 'output.png"'
+        plt.savefig(filename, format='png')
+        await ctx.send(file=discord.File(filename))
+        plt.close()
+        
+    except CustomError as e:
+        await ctx.send(e)
+    
 
 @bot.command(name='chart')
 async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
@@ -41,37 +84,40 @@ async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
         startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
         endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
 
-    usage = '$chart [stockName] [startDate] [endDate]'
+    usage: 
+        $chart [stockName] [startDate] [endDate]
+        $chart-us [stockName] [startDate] [endDate] for Non Indian Companies
 
     Example:
-        $chart aapl
-        $chart aapl 2021-02-01
-        $chart aapl 2021-02-01 2022-02-01
+        $chart-us aapl
+        $chart reliance
+        $chart reliance 2021-02-01
+        $chart reliance 2021-02-01 2022-02-01
     """
+    stockName = stockName = f'{stockName}.NS'
+    await Stock_chart(ctx,stockName,startDate,endDate)
 
-    if not is_valid_date(startDate) or not is_valid_date(endDate):
-        raise commands.BadArgument("Invalid date format. Use 'YYYY-MM-DD'.")
-
-    start_date = datetime.strptime(startDate, "%Y-%m-%d")
-    end_date = datetime.strptime(endDate, "%Y-%m-%d")
-
-    if end_date <= start_date:
-        raise commands.BadArgument("End date must be greater than start date.")
+@bot.command(name='chart-us')
+async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
+    """
+    Return Stock Performances over a period of time. For Non-Indian Companies
     
-    data = yf.download(stockName,start=start_date,end=end_date)
-    print(data.head())
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
+        startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
+        endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
 
-    if data.empty:
-        raise commands.BadArgument(f"No data available for {stockName}.")
-    
-    
-    await ctx.send(stockName)
+    usage: 
+        $chart [stockName] [startDate] [endDate]
+        $chart-us [stockName] [startDate] [endDate] for Non Indian Companies
 
-@chart.error
-async def chart_error(ctx, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("Stock name is required. Use '$chart <stockName> [startDate] [endDate]'.")
-    elif isinstance(error, commands.BadArgument):
-        await ctx.send(error)
+    Example:
+        $chart-us aapl
+        $chart reliance
+        $chart reliance 2021-02-01
+        $chart reliance 2021-02-01 2022-02-01
+    """
+    await Stock_chart(ctx,stockName,startDate,endDate)
+
 
 bot.run(discord_token)
