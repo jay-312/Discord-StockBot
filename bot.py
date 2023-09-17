@@ -41,6 +41,7 @@ async def Stock_chart(ctx,stockName,startDate,endDate):
     #check if the dates are in valid format or not
     try:
         StockDisplay = stockName.split('.')[0].upper()
+        print(StockDisplay)
         if not is_valid_date(startDate) or not is_valid_date(endDate):
             raise CustomError("Invalid date format. Use 'YYYY-MM-DD'.")
         
@@ -69,7 +70,7 @@ async def Stock_chart(ctx,stockName,startDate,endDate):
         plt.savefig(filename, format='png')
         await ctx.send(file=discord.File(filename))
         plt.close()
-        
+
     except CustomError as e:
         await ctx.send(e)
     
