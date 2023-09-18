@@ -4,6 +4,8 @@ from discord.ext import commands, tasks
 import yfinance as yf
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+from bs4 import BeautifulSoup
+import requests
 
 discord_token = config.API['DiscordToken']
 
@@ -40,7 +42,7 @@ class CustomError(commands.CommandError):
 async def Stock_chart(ctx,stockName,startDate,endDate):    
     #check if the dates are in valid format or not
     try:
-        StockDisplay = stockName.split('.')[0].upper()
+        StockDisplay = stockName.split('.')[0].upper() #StockName to be displayed to user
         print(StockDisplay)
         if not is_valid_date(startDate) or not is_valid_date(endDate):
             raise CustomError("Invalid date format. Use 'YYYY-MM-DD'.")
@@ -78,19 +80,17 @@ async def Stock_chart(ctx,stockName,startDate,endDate):
 @bot.command(name='chart')
 async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
     """
-    Return Stock Performances over a period of time.
+    Return Stock Performances over a period of time. For Companies listed under NSE
     
     Arguments:
-        stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
         startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
         endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
 
     usage: 
         $chart [stockName] [startDate] [endDate]
-        $chart-us [stockName] [startDate] [endDate] for Non Indian Companies
 
     Example:
-        $chart-us aapl
         $chart reliance
         $chart reliance 2021-02-01
         $chart reliance 2021-02-01 2022-02-01
@@ -101,7 +101,7 @@ async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
 @bot.command(name='chart-us')
 async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
     """
-    Return Stock Performances over a period of time. For Non-Indian Companies
+    Return Stock Performances over a period of time. For Companies listed under NASDAQ
     
     Arguments:
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
@@ -109,16 +109,64 @@ async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
         endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
 
     usage: 
-        $chart [stockName] [startDate] [endDate]
-        $chart-us [stockName] [startDate] [endDate] for Non Indian Companies
+        $chart-us [stockName] [startDate] [endDate]
 
     Example:
         $chart-us aapl
-        $chart reliance
-        $chart reliance 2021-02-01
-        $chart reliance 2021-02-01 2022-02-01
+        $chart-us aapl 2021-02-01
+        $chart-us aapl 2021-02-01 2022-02-01
     """
     await Stock_chart(ctx,stockName,startDate,endDate)
 
+#Return the current Stock Price for the given stock symbol
+async def current_price(ctx,stockName):
+    StockDisplay = stockName.split('.')[0].upper() #StockName to be displayed to user
+    URL = "https://finance.yahoo.com/quote/" + stockName
+    #setting custom User-Agent header to mimic a web browser (getting 404 for scraping) 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"}
+    page = requests.get(URL, headers=headers)
+    soup = BeautifulSoup(page.text, "html.parser")
+    try:
+        current_price = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[0]
+        change = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[1]
+        await ctx.send(StockDisplay + "\t" + current_price.text + "\t" + change.text)
+
+    except IndexError as e:
+        await ctx.send('Data Not Found')
+
+@bot.command(name='price')
+async def price_nse(ctx,stockName):
+    """
+    Return Current Stock Price. For Companies listed under NSE
+    
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
+
+    usage: 
+        $price [stockName]
+
+    Example:
+        $price reliance
+        
+    """
+    stockName = stockName = f'{stockName}.NS'
+    await current_price(ctx,stockName)
+
+@bot.command(name='price-us')
+async def price_nasdaq(ctx,stockName):
+    """
+    Return Current Stock Price. For Companies listed under NASDAQ
+    
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
+
+    usage: 
+        $price-us [stockName]
+
+    Example:
+        $price-us aapl
+        
+    """
+    await current_price(ctx,stockName)
 
 bot.run(discord_token)
