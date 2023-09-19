@@ -43,7 +43,7 @@ async def Stock_chart(ctx,stockName,startDate,endDate):
     #check if the dates are in valid format or not
     try:
         StockDisplay = stockName.split('.')[0].upper() #StockName to be displayed to user
-        print(StockDisplay)
+        # print(StockDisplay)
         if not is_valid_date(startDate) or not is_valid_date(endDate):
             raise CustomError("Invalid date format. Use 'YYYY-MM-DD'.")
         
@@ -75,48 +75,6 @@ async def Stock_chart(ctx,stockName,startDate,endDate):
 
     except CustomError as e:
         await ctx.send(e)
-    
-
-@bot.command(name='chart')
-async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
-    """
-    Return Stock Performances over a period of time. For Companies listed under NSE
-    
-    Arguments:
-        stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
-        startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
-        endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
-
-    usage: 
-        $chart [stockName] [startDate] [endDate]
-
-    Example:
-        $chart reliance
-        $chart reliance 2021-02-01
-        $chart reliance 2021-02-01 2022-02-01
-    """
-    stockName = stockName = f'{stockName}.NS'
-    await Stock_chart(ctx,stockName,startDate,endDate)
-
-@bot.command(name='chart-us')
-async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
-    """
-    Return Stock Performances over a period of time. For Companies listed under NASDAQ
-    
-    Arguments:
-        stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
-        startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
-        endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
-
-    usage: 
-        $chart-us [stockName] [startDate] [endDate]
-
-    Example:
-        $chart-us aapl
-        $chart-us aapl 2021-02-01
-        $chart-us aapl 2021-02-01 2022-02-01
-    """
-    await Stock_chart(ctx,stockName,startDate,endDate)
 
 #Return the current Stock Price for the given stock symbol
 async def current_price(ctx,stockName):
@@ -129,13 +87,110 @@ async def current_price(ctx,stockName):
     try:
         current_price = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[0]
         change = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[1]
-        await ctx.send(StockDisplay + "\t" + current_price.text + "\t" + change.text)
+        await ctx.send(StockDisplay + " :\t" + current_price.text + "\t" + change.text)
 
     except IndexError as e:
         await ctx.send('Data Not Found')
 
+#Return the Information of the given stock
+async def stock_info(ctx,stockName):
+    StockDisplay = stockName.split('.')[0].upper() #StockName to be displayed to user
+    yf_symbol = yf.Ticker(stockName)
+    embed = discord.Embed(
+        title = f'{StockDisplay} Information',
+        colour = discord.Colour.blue()
+    )
+    info = yf_symbol.info
+    try:
+        if 'longName' not in info:
+            raise CustomError(f'Info on stock symbol {StockDisplay} is not available.')
+        Name = info.get('longName', 'N/A')
+        industryDisp = info.get('industryDisp', 'N/A')
+        sectorDisp = info.get('sectorDisp', 'N/A')
+        dayLow = info.get('dayLow', 'N/A')
+        dayHigh = info.get('dayHigh', 'N/A')
+        fiftyTwoWeekLow = info.get('fiftyTwoWeekLow', 'N/A')
+        fiftyTwoWeekHigh = info.get('fiftyTwoWeekHigh', 'N/A')
+        currency = info.get('currency', 'N/A')
+        # exchange = info.get('exchange', 'N/A')
+        phone = info.get('phone', 'N/A')
+        website = info.get('website', 'N/A')
+        # creating a Business Summary of len around 500
+        longBusinessSummary = info.get('longBusinessSummary', 'N/A').split('. ')
+        BusinessSummary = ''
+        while len(BusinessSummary) < 600 and longBusinessSummary:
+            BusinessSummary += f'{longBusinessSummary.pop(0)}. '
+        # BusinessSummary = ". ".join(longBusinessSummary[:4]).rstrip() + "."
+        # create a single address from the given json
+        address_parts = []
+        address_parts.append(info.get('address1', 'N/A'))
+        address_parts.append(info.get('city', ''))
+        address_parts.append(info.get('country', ''))
+        address_parts.append(info.get('zip', ''))
+        address = "\n".join(address_parts)
+
+        embed.add_field(name="Name", value=Name, inline=True)
+        embed.add_field(name="Symbol", value=StockDisplay, inline=True)
+        embed.add_field(name="Industry", value=industryDisp, inline=True)
+        embed.add_field(name="Sector", value=sectorDisp, inline=True)
+        embed.add_field(name="Day Low", value=dayLow, inline=True)
+        embed.add_field(name="Day High", value=dayHigh, inline=True)
+        embed.add_field(name="52 Weeks Low", value=fiftyTwoWeekLow, inline=True)
+        embed.add_field(name="52 Weeks High", value=fiftyTwoWeekHigh, inline=True)
+        embed.add_field(name="Currency", value=currency, inline=True)
+        # embed.add_field(name="exchange", value=exchange, inline=True)
+        embed.add_field(name="Business Summary", value=BusinessSummary, inline=False)
+        embed.add_field(name="Phone", value=phone, inline=True)
+        embed.add_field(name="Address", value=address, inline=True)
+        embed.add_field(name="Website", value=website, inline=True)
+        await ctx.send(embed=embed)
+    
+    except CustomError as e:
+        await ctx.send(e)
+
+@bot.command(name='chart')
+async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
+    """
+    Return Stock Performances over a period of time. For Companies listed under NSE
+    
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
+        startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
+        endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
+
+    usage: 
+        `$chart [stockName] [startDate] [endDate]`
+
+    Example:
+        `$chart reliance`
+        `$chart reliance 2021-02-01`
+        `$chart reliance 2021-02-01 2022-02-01`
+    """
+    stockName = stockName = f'{stockName}.NS'
+    await Stock_chart(ctx,stockName,startDate,endDate)
+
+@bot.command(name='chart-us')
+async def chart_us(ctx,stockName,startDate = startDate,endDate = endDate):
+    """
+    Return Stock Performances over a period of time. For Companies listed under NASDAQ
+    
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
+        startDate (date,optinal): The start date in the format 'YYYY-MM-DD' (default 2 years back from today).
+        endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
+
+    usage: 
+        `$chart-us [stockName] [startDate] [endDate]`
+
+    Example:
+        `$chart-us aapl`
+        `$chart-us aapl 2021-02-01`
+        `$chart-us aapl 2021-02-01 2022-02-01`
+    """
+    await Stock_chart(ctx,stockName,startDate,endDate)
+
 @bot.command(name='price')
-async def price_nse(ctx,stockName):
+async def price(ctx,stockName):
     """
     Return Current Stock Price. For Companies listed under NSE
     
@@ -143,17 +198,17 @@ async def price_nse(ctx,stockName):
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
 
     usage: 
-        $price [stockName]
+        `$price [stockName]`
 
     Example:
-        $price reliance
+        `$price reliance`
         
     """
     stockName = stockName = f'{stockName}.NS'
     await current_price(ctx,stockName)
 
 @bot.command(name='price-us')
-async def price_nasdaq(ctx,stockName):
+async def price_us(ctx,stockName):
     """
     Return Current Stock Price. For Companies listed under NASDAQ
     
@@ -161,12 +216,67 @@ async def price_nasdaq(ctx,stockName):
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
 
     usage: 
-        $price-us [stockName]
+        `$price-us [stockName]`
 
     Example:
-        $price-us aapl
+        `$price-us aapl`
         
     """
     await current_price(ctx,stockName)
+
+@bot.command(name='info')
+async def info(ctx,stockName):
+    """
+    Return Information for the provided stock. For Companies listed under NSE
+    
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
+
+    usage: 
+        `$info [stockName]`
+
+    Example:
+        `$info reliance`
+        
+    """
+    print(stockName + "NA")
+    stockName = stockName = f'{stockName}.NS'
+    await stock_info(ctx,stockName)
+
+@bot.command(name='info-us')
+async def info_us(ctx,stockName):
+    """
+    Return Information for the provided stock. For Companies listed under NASDAQ
+    
+    Arguments:
+        stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
+
+    usage: 
+        `$info-us [stockName]`
+
+    Example:
+        `$info-us AAPL`
+        
+    """        
+    await stock_info(ctx,stockName)
+
+
+# Error handling for the MissingRequiredArgument
+@info.error
+@info_us.error
+@price.error
+@price_us.error
+@chart.error
+@chart_us.error
+async def missing_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Please provide a stock symbol.")    
+
+# CommandNotFound error handler
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        await ctx.send("Command not found. Use `$help` to see a list of available commands.")
+
 
 bot.run(discord_token)
