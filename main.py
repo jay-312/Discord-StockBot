@@ -129,8 +129,9 @@ async def price(interaction: discord.Integration, stock_name: str,exchange : app
         change = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[1]
         await interaction.response.send_message(f"{StockDisplay}\t{current_price.text}\t{change.text}")
 
-    except IndexError as e:
-        await interaction.response.send_message('Data Not Found')
+    except Exception as e:
+        print(e)
+        await interaction.response.send_message(f'Info on stock symbol {StockDisplay} is not available on {exchange.name} exchange. Try different exchange.')
 
 #info command to Return the Information of the given stock
 @bot.tree.command(name='info',description="Return Information for the stock.")
@@ -152,10 +153,10 @@ async def info(interaction: discord.Integration, stock_name: str,exchange : app_
         title = f'{StockDisplay} Information',
         colour = discord.Colour.blue()
     )
-    info = yf_symbol.info
     try:
+        info = yf_symbol.info
         if 'longName' not in info:
-            raise CustomError(f'Info on stock symbol {StockDisplay} is not available.')
+            raise CustomError(f'Info on stock symbol {StockDisplay} is not available on {exchange.name} exchange. Try different exchange.')
         Name = info.get('longName', 'N/A')
         industryDisp = info.get('industryDisp', 'N/A')
         sectorDisp = info.get('sectorDisp', 'N/A')
@@ -197,8 +198,9 @@ async def info(interaction: discord.Integration, stock_name: str,exchange : app_
         embed.add_field(name="Website", value=website, inline=True)
         await interaction.response.send_message(embed=embed)
     
-    except CustomError as e:
-        await interaction.response.send_message(e)
+    except Exception as e:
+        print(e)
+        await interaction.response.send_message(f'Info on stock symbol {StockDisplay} is not available on {exchange.name} exchange. Try different exchange.')
 
 @bot.tree.command(name='index',description='Return Current Price and price change for NASDAQ and Nifty 50 and Nifty Bank')
 async def index(interaction:discord.Integration):
@@ -236,5 +238,65 @@ async def index(interaction:discord.Integration):
     embed.add_field(name="Change", value=indexchange, inline=True)
         
     await interaction.edit_original_response(embed=embed)
+
+@bot.tree.command(name='stocknews',description='Return the news of the specfic stock symbol (Source: Google Finance)')
+@app_commands.describe(stock_name = "Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).",
+                       exchange = "If Company is listed under NSE(Indian Market) or NASDAQ(NON-Indian Market)"
+                       )
+@app_commands.choices(exchange = [
+            app_commands.Choice(name='NSE',value='nse'),
+            app_commands.Choice(name='NASDAQ',value='nasdaq')
+        ])
+async def info(interaction: discord.Integration, stock_name: str,exchange : app_commands.Choice[str]):
+    StockDisplay = stock_name.upper() #StockName to be displayed to user
+    URL = f"https://www.google.com/finance/quote/{StockDisplay}:{exchange.name}?hl=en"
+    # setting custom User-Agent header to mimic a web browser (getting 404 for scraping) 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"}
+    page = requests.get(URL, headers=headers)
+    soup = BeautifulSoup(page.text, "html.parser")
+    try:
+        all_news = soup.find_all("div", {"class":"yWOrNb"})
+        if all_news == []:
+            raise CustomError(f"News for {StockDisplay} is not available on {exchange.name} exchange. Try different exchange")
+        embeds = []
+        all_news_scroll = all_news[0].find_all("div", {"class":"qQfHId"})
+        for news in all_news_scroll:
+            heading = news.find_all("div",{"class":"xr68cf"})[0].text
+            if heading == 'Opinion':
+                continue
+            embed = discord.Embed(
+            title = heading,
+            colour = discord.Colour.blue()
+            )
+            links = news.find_all("a",{"class":"TxRU9d"})
+            for link in links:
+                href = link.get("href")
+                source = link.find_all("div", {"class":"AYBNIb"})[0].text
+                name = link.find_all("div", {"class":"F2KAFc"})[0].text
+                update = link.find_all("div", {"class":"HzW5e"})[0].text
+                embed.add_field(name=name, value=f"{href}\n{source}\n{update}\n ‎",inline=False)
+                # embed.add_field(name = chr(173), value = chr(173))
+            embeds.append(embed)
+        # Some More News
+        extra_news = all_news[0].find_all("div", {"class":"yY3Lee"})
+        heading = all_news[0].find_all("div", {"class":"yV3rjd"})
+        heading = heading[0].text if heading else "Some More News"
+        embed = discord.Embed(
+        title = heading,
+        colour = discord.Colour.blue()
+        )
+        for news in extra_news:
+            link = news.find_all("a")[0]
+            href = link.get("href")
+            source = link.find_all("div", {"class":"sfyJob"})[0].text
+            name = link.find_all("div", {"class":"Yfwt5"})[0].text
+            update = link.find_all("div", {"class":"Adak"})[0].text
+            embed.add_field(name=name, value=f"{href}\n{source}\n{update}\n ‎",inline=False)
+        embeds.append(embed)
+        await interaction.response.send_message(content=f"News for {StockDisplay}",embeds=embeds)
+
+    except Exception as e:
+        print(e)
+        await interaction.response.send_message(f'Info on stock symbol {StockDisplay} is not available on {exchange.name} exchange. Try different exchange.')
 
 bot.run(discord_token)
