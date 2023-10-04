@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands,tasks
 from discord import app_commands
 import config
 import yfinance as yf
@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 import requests
+from urllib.parse import urljoin
 
 discord_token = config.API['DiscordToken']
 
@@ -17,20 +18,15 @@ bot = commands.Bot(command_prefix='.', intents=intents)
 
 @bot.event
 async def on_ready():
+    news_once_a_day.start()
     print("bot is ready")
-    # try:
-    #     # print(ctx.guild.id)
-    #     synced = await bot.tree.sync(guild=discord.Object(id=1151895074439966791))
-    #     print(f"Synced {len(synced)} Command(s)")
-    # except Exception as e:
-    #     print(e)
 
 @bot.command(name='sync')
 async def sync(ctx):
     try:
         # print(ctx.guild.id)
         # bot.tree.copy_global_to(guild=ctx.guild)
-        synced = await bot.tree.sync(guild=ctx.guild)
+        synced = await bot.tree.sync()
         await ctx.send(f"Synced {len(synced)} Command(s)")
     except Exception as e:
         print(e)
@@ -247,7 +243,7 @@ async def index(interaction:discord.Integration):
             app_commands.Choice(name='NSE',value='nse'),
             app_commands.Choice(name='NASDAQ',value='nasdaq')
         ])
-async def info(interaction: discord.Integration, stock_name: str,exchange : app_commands.Choice[str]):
+async def stocknews(interaction: discord.Integration, stock_name: str,exchange : app_commands.Choice[str]):
     StockDisplay = stock_name.upper() #StockName to be displayed to user
     URL = f"https://www.google.com/finance/quote/{StockDisplay}:{exchange.name}?hl=en"
     # setting custom User-Agent header to mimic a web browser (getting 404 for scraping) 
@@ -299,4 +295,78 @@ async def info(interaction: discord.Integration, stock_name: str,exchange : app_
         print(e)
         await interaction.response.send_message(f'Info on stock symbol {StockDisplay} is not available on {exchange.name} exchange. Try different exchange.')
 
+# write the guild and channel to file for back-up
+def write_to_file(filename,text):
+    file = open(filename,'a')
+    file.write(f'{text}\n')
+    file.close()
+
+#remove the channel from the file if they turn off news update
+def remove_from_file(filename,text):
+    file = open(filename,'r')
+    lines = file.readlines()
+    file = open(filename,'w')
+    for line in lines:
+        # strip() is used to remove '\n' present at the end of each line
+        if line.strip('\n') != text:
+            file.write(line)
+    file.close()
+
+@tasks.loop(seconds=10)
+async def news_once_a_day():
+    URL = 'https://news.google.com/topics/CAAqKggKIiRDQkFTRlFvSUwyMHZNRGx6TVdZU0JXVnVMVWRDR2dKSlRpZ0FQAQ?ceid=IN:en&oc=3'
+    # setting custom User-Agent header to mimic a web browser (getting 404 for scraping) 
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"}
+    page = requests.get(URL, headers=headers)
+    soup = BeautifulSoup(page.text, "html.parser")
+    # await interaction.response.send_message("Today's Business News")
+    all_news = soup.find_all("c-wiz", {"class":"PO9Zff Ccj79 kUVvS"})
+    try:
+        embed = discord.Embed(
+        title = "Today's Business News",
+        colour = discord.Colour.blue()
+        )
+        counter = 0
+        while counter < 10:
+            counter += 1
+            news = all_news[counter]
+            article = news.find_all("article")[0]
+            href = article.find_all("a")[0].get('href')
+            source = article.find_all("div", {"class":"vr1PYe"})[0].text
+            name = article.find_all("h4")[0].text
+            update = article.find_all("time", {"class":"hvbAAd"})[0].text
+            baseUrl = 'https://news.google.com/'
+            final_href = urljoin(baseUrl,href)
+            embed.add_field(name=source, value=f"**[{name}]({final_href})**\n{update}\n ‎",inline=False)
+        file = open("daily_news_ids.txt",'r')
+        lines = file.readlines()
+        file.close()
+        for line in lines:
+            line = line.strip('\n').split('$')
+            guild = bot.get_guild(int(line[0]))
+            if guild:
+                channel = guild.get_channel(int(line[1]))
+                if channel:
+                    await channel.send(embed=embed)
+                else:
+                    pass
+            else:
+                pass
+
+    except Exception as e:
+        print(e)
+
+@bot.tree.command(name='news',description='Return the latest Business News at 8 AM IST (Source: Google News)')
+@app_commands.describe(status = "Turn the news updates ON or OFF.")
+@app_commands.choices(status = [
+            app_commands.Choice(name='ON',value='ON'),
+            app_commands.Choice(name='OFF',value='OFF')
+        ])
+async def news(interaction: discord.Integration, status : app_commands.Choice[str]):
+    unique_id = f"{interaction.guild_id}${interaction.channel_id}"
+    if status.value == 'ON':
+        write_to_file("daily_news_ids.txt",unique_id)
+    else :
+        remove_from_file("daily_news_ids.txt",unique_id)
+    
 bot.run(discord_token)
