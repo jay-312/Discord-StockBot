@@ -1,6 +1,6 @@
 import discord
-import config
 from discord.ext import commands, tasks
+import config
 import yfinance as yf
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
@@ -68,7 +68,7 @@ async def Stock_chart(ctx,stockName,startDate,endDate):
         plt.ylabel('Price')
         plt.legend()
         plt.grid(True)
-        filename = 'output.png"'
+        filename = 'output.png'
         plt.savefig(filename, format='png')
         await ctx.send(file=discord.File(filename))
         plt.close()
@@ -159,14 +159,14 @@ async def chart(ctx,stockName,startDate = startDate,endDate = endDate):
         endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
 
     usage: 
-        `$chart [stockName] [startDate] [endDate]`
+        $chart [stockName] [startDate] [endDate]
 
     Example:
-        `$chart reliance`
-        `$chart reliance 2021-02-01`
-        `$chart reliance 2021-02-01 2022-02-01`
+        $chart reliance
+        $chart reliance 2021-02-01
+        $chart reliance 2021-02-01 2022-02-01
     """
-    stockName = stockName = f'{stockName}.NS'
+    stockName = f'{stockName}.NS'
     await Stock_chart(ctx,stockName,startDate,endDate)
 
 @bot.command(name='chart-us')
@@ -180,12 +180,12 @@ async def chart_us(ctx,stockName,startDate = startDate,endDate = endDate):
         endDate (date,optinal): The end date in the format 'YYYY-MM-DD'. Must be greater than startdate (default today).
 
     usage: 
-        `$chart-us [stockName] [startDate] [endDate]`
+        $chart-us [stockName] [startDate] [endDate]
 
     Example:
-        `$chart-us aapl`
-        `$chart-us aapl 2021-02-01`
-        `$chart-us aapl 2021-02-01 2022-02-01`
+        $chart-us aapl
+        $chart-us aapl 2021-02-01
+        $chart-us aapl 2021-02-01 2022-02-01
     """
     await Stock_chart(ctx,stockName,startDate,endDate)
 
@@ -198,10 +198,10 @@ async def price(ctx,stockName):
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
 
     usage: 
-        `$price [stockName]`
+        $price [stockName]
 
     Example:
-        `$price reliance`
+        $price reliance
         
     """
     stockName = stockName = f'{stockName}.NS'
@@ -216,10 +216,10 @@ async def price_us(ctx,stockName):
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
 
     usage: 
-        `$price-us [stockName]`
+        $price-us [stockName]
 
     Example:
-        `$price-us aapl`
+        $price-us aapl
         
     """
     await current_price(ctx,stockName)
@@ -233,13 +233,12 @@ async def info(ctx,stockName):
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of apple -> aapl).
 
     usage: 
-        `$info [stockName]`
+        $info [stockName]
 
     Example:
-        `$info reliance`
+        $info reliance
         
     """
-    print(stockName + "NA")
     stockName = stockName = f'{stockName}.NS'
     await stock_info(ctx,stockName)
 
@@ -252,13 +251,63 @@ async def info_us(ctx,stockName):
         stockName (str): Give the Stock symbol of the stock (example Stock symbol of HDFC Bank Limited -> HDFCBANK).
 
     usage: 
-        `$info-us [stockName]`
+        $info-us [stockName]
 
     Example:
-        `$info-us AAPL`
+        $info-us AAPL
         
     """        
     await stock_info(ctx,stockName)
+
+@bot.command(name='index')
+async def index(ctx):
+    """
+    Return Current Price and price change for NASDAQ and Nifty 50 and Nifty Bank
+    
+    Arguments:
+        None
+
+    usage: 
+        $index
+
+    Example:
+        $index
+    """
+    embed = discord.Embed(
+        title = 'Indexes',
+        colour = discord.Colour.blue()
+    )
+    embed.set_footer(text="Data from Yahoo Finance")
+    await ctx.send("Searching for data...")
+    three = [["NASDAQ", "^IXIC"], ["Nifty 50", "^NSEI"], ["Nifty Bank", "^NSEBANK"]]
+    indexname = ""
+    indexprice = ""
+    indexchange = ""
+    for i in range(3):
+        URL = "https://finance.yahoo.com/quote/" + three[i][1]
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"}
+        page = requests.get(URL, headers=headers)
+        soup = BeautifulSoup(page.text, "html.parser")
+        try:
+            current_price = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[0]
+            change = soup.find_all("div", {"class":"My(6px) Pos(r) smartphone_Mt(6px) W(100%)"})[0].find_all("fin-streamer")[1]
+            indexname += three[i][0] + "\n"
+            if i==0:
+                indexprice += current_price.text + " (USD)\n"
+            else:
+                indexprice += current_price.text + " (INR)\n"
+            indexchange += change.text + "\n"
+        except:
+            indexname += three[i][0] + "\n"
+            indexprice += "No data found\n"
+            indexchange += "No data found\n"
+
+    embed.add_field(name="Index", inline=False)
+    embed.add_field(name="Price", value=indexprice, inline=True)
+    embed.add_field(name="Change", value=indexchange, inline=True)
+        
+    await ctx.send(embed=embed)
+
 
 
 # Error handling for the MissingRequiredArgument
