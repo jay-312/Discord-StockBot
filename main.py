@@ -3,7 +3,7 @@ from discord.ext import commands,tasks
 from discord import app_commands
 import config
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import *
 import matplotlib.pyplot as plt
 from bs4 import BeautifulSoup
 import requests
@@ -312,7 +312,9 @@ def remove_from_file(filename,text):
             file.write(line)
     file.close()
 
-@tasks.loop(seconds=10)
+ist_timezone = timezone(timedelta(hours=5, minutes=30)) # create timezone IST (UTC + 5:30)
+loop_time = time(hour=8,minute=00,tzinfo=ist_timezone)  # create time 8 AM IST
+@tasks.loop(time=loop_time)
 async def news_once_a_day():
     URL = 'https://news.google.com/topics/CAAqKggKIiRDQkFTRlFvSUwyMHZNRGx6TVdZU0JXVnVMVWRDR2dKSlRpZ0FQAQ?ceid=IN:en&oc=3'
     # setting custom User-Agent header to mimic a web browser (getting 404 for scraping) 
@@ -338,6 +340,7 @@ async def news_once_a_day():
             baseUrl = 'https://news.google.com/'
             final_href = urljoin(baseUrl,href)
             embed.add_field(name=source, value=f"**[{name}]({final_href})**\n{update}\n ‎",inline=False)
+        # Find the channels with news command status ON and send news on those channels
         file = open("daily_news_ids.txt",'r')
         lines = file.readlines()
         file.close()
