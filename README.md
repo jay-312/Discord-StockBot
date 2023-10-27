@@ -5,9 +5,9 @@
 The Discord Stock Bot is a versatile Discord bot designed to provide real-time stock market data and news updates directly in your Discord server. With this bot, users can easily access stock prices, charts, company information, and the latest financial news, all within their Discord environment. The bot offers a seamless way to stay informed about financial markets without leaving your Discord server.
 
 ## Table of Contents
-1. [Technical Documentation](https://github.com/jay-312/Discord-StockBot/new/main?readme=1#technical-documentation)
-2. [Bot Features](https://github.com/jay-312/Discord-StockBot/new/main?readme=1#how-the-bot-works)
-3. User Documentation
+1. [Technical Documentation](#technical-documentation)
+2. [Bot Features](#bot-features)
+3. [User Documentation](#user-documentation)
 
 ## Technical Documentation
 
